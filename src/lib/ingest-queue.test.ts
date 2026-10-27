@@ -84,6 +84,7 @@ import { autoIngest } from "./ingest"
 import { deleteFile, readFile, writeFile, writeFileAtomic } from "@/commands/fs"
 import { sweepResolvedReviews } from "./sweep-reviews"
 import { useWikiStore } from "@/stores/wiki-store"
+import { getProjectPathById } from "@/lib/project-identity"
 
 const mockAutoIngest = vi.mocked(autoIngest)
 const mockReadFile = vi.mocked(readFile)
@@ -248,6 +249,14 @@ describe("ingest-queue — persistence failures", () => {
     read.resolve("[]")
     await restoring
     expect(getQueue()).toEqual([])
+  })
+
+  it("pauses after a task-start lookup failure instead of rescheduling in a loop", async () => {
+    vi.mocked(getProjectPathById).mockRejectedValueOnce(new Error("registry unavailable"))
+    await enqueueIngest(TEST_ID, "raw/sources/report.md")
+    await waitFor(() => getQueueSummary().paused)
+    expect(mockAutoIngest).not.toHaveBeenCalled()
+    expect(getQueue()[0]).toMatchObject({ status: "pending", retryCount: 0 })
   })
 })
 

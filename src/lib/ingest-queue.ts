@@ -1395,6 +1395,12 @@ async function processNext(projectId: string): Promise<void> {
       )
     }
   } catch (error) {
+    // Leave pending work recoverable instead of spinning the scheduler after
+    // a registry or persistence failure during task startup.
+    if (currentProjectId === projectId && queueEpoch === epoch) {
+      paused = true
+      notifyQueueListeners()
+    }
     console.error("[Ingest Queue] Scheduling failed:", error)
   } finally {
     scheduling = false
